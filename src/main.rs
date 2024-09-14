@@ -8,6 +8,8 @@ use futures::{AsyncReadExt, AsyncWriteExt};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
+const BUFFER_SIZE: usize = 8192;
+
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -96,7 +98,7 @@ async fn stream_to_stdout(mut stream: TcpStream) -> Result<()> {
     // we cloud simply use io::copy to pipe the tcpstream to stdout. However, this doesn't flush
     // stdout unless there is a newline
     //  let _res = io::copy(&mut stream, &mut stdout).await;
-    let mut buf = [0u8; 8192];
+    let mut buf = [0u8; BUFFER_SIZE];
     loop {
         let bytes_read = stream.read(&mut buf).await.unwrap();
         match bytes_read {
