@@ -1,5 +1,5 @@
 # netkat
-A simple netcat clone written in Rust. Supports only IPv4 / TCP. Concurrency implemented using async model.
+A simple netcat clone written in Rust. Supports only IPv4 and TCP/UDP. Concurrency implemented using async model.
 
 ## Usage
 
@@ -13,6 +13,7 @@ Arguments:
 
 Options:
   -l, --listen   Listen to incoming connection
+  -u, --udp      Use UDP instead of TCP
   -v, --verbose  Verbose output
   -h, --help     Print help
   -V, --version  Print version
