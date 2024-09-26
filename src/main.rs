@@ -1,7 +1,7 @@
 use async_std::io::{self};
 
+use async_std::net::{SocketAddr, ToSocketAddrs};
 use async_std::net::{TcpListener, TcpStream, UdpSocket};
-use std::net::SocketAddr;
 
 use clap::Parser;
 
@@ -39,10 +39,17 @@ fn main() -> Result<()> {
     if args.listen {
         match args.port {
             Some(1_u16..=u16::MAX) => {
-                return async_std::task::block_on(run_server(
-                    &args.hostname.unwrap(),
-                    args.port.unwrap(),
-                ));
+                if args.udp {
+                    return async_std::task::block_on(run_tcp_server(
+                        &args.hostname.unwrap(),
+                        args.port.unwrap(),
+                    ));
+                } else {
+                    return async_std::task::block_on(run_udp_server(
+                        &args.hostname.unwrap(),
+                        args.port.unwrap(),
+                    ));
+                }
             }
             Some(_) => {
                 eprintln!("Invalid port number");
@@ -61,74 +68,102 @@ fn main() -> Result<()> {
             eprintln!("No port given");
             return Ok(());
         }
-        return async_std::task::block_on(run_client(&args.hostname.unwrap(), args.port.unwrap()));
+        if args.udp {
+            return async_std::task::block_on(run_udp_client(
+                &args.hostname.unwrap(),
+                args.port.unwrap(),
+            ));
+        } else {
+            return async_std::task::block_on(run_tcp_client(
+                &args.hostname.unwrap(),
+                args.port.unwrap(),
+            ));
+        }
     }
 
     Ok(())
 }
 
-async fn run_client(hostname: &str, target_port: u16) -> Result<()> {
-    let args = Args::parse();
+async fn run_udp_client(hostname: &str, target_port: u16) -> Result<()> {
+    let udp_socket = std::net::UdpSocket::bind("127.0.0.1:0")?;
+    let cloned_socket = udp_socket.try_clone()?;
+    let async_socket = UdpSocket::from(udp_socket);
+    let async_clone = UdpSocket::from(cloned_socket);
     let target = format!("{}:{}", hostname, target_port);
-    if args.udp {
-        return Ok(());
-    } else {
-        let mut stream = TcpStream::connect(target).await?;
-        run_tcpstream_tasks(&mut stream).await
+    let server = target.to_socket_addrs().unwrap().next().expect("foo");
+
+    let stdin_task = stdin_to_udpsocket(async_socket, server).fuse();
+    let stdout_task = udpsocket_to_stdout(async_clone).fuse();
+
+    pin_mut!(stdin_task, stdout_task);
+    select! {
+        _res = stdin_task => _res?,
+        _res = stdout_task => _res?,
     }
+    Ok(())
 }
 
-async fn run_server(bind_addr: &str, bind_port: u16) -> Result<()> {
+async fn run_tcp_client(hostname: &str, target_port: u16) -> Result<()> {
+    let target = format!("{}:{}", hostname, target_port);
+    let mut stream = TcpStream::connect(target).await?;
+    run_tcpstream_tasks(&mut stream).await
+}
+
+async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
     let args = Args::parse();
     let serveraddr = format!("{}:{}", bind_addr, bind_port);
-    if args.udp {
-        // UDP stuff
-        if args.verbose {
-            eprintln!("Listening udp socket at {:?}", serveraddr);
-        }
 
-        // Some dirty hacks here, since async_std::net::UdpSocket doesn't implement try_clone(),
-        // we'll first create non-async UDP socket, clone it and turn into async sockets once
-        // we have an active peer.
-        let udp_socket = std::net::UdpSocket::bind(serveraddr)?;
-        let mut buf = [0_u8; BUFFER_SIZE];
-        let (bytes, peer) = udp_socket.recv_from(&mut buf)?; // First come first served
-        if args.verbose {
-            eprintln!("Peer connected at {:?}", peer)
-        }
-        io::stdout().write_all(&buf[0..bytes]).await?;
-        io::stdout().flush().await?;
-
-        let cloned_socket = udp_socket.try_clone()?;
-        let async_socket = UdpSocket::from(udp_socket);
-        let async_clone = UdpSocket::from(cloned_socket);
-
-        let stdin_task = stdin_to_udpsocket(async_socket, peer).fuse();
-        let stdout_task = udpsocket_to_stdout(async_clone).fuse();
-
-        pin_mut!(stdin_task, stdout_task);
-        select! {
-            _res = stdin_task => _res?,
-            _res = stdout_task => _res?,
-        }
-        return Ok(());
-    } else {
-        // TCP
-        if args.verbose {
-            eprintln!("Listening to TCP socket at {}", serveraddr)
-        }
-        let listener = TcpListener::bind(serveraddr).await?;
-        match listener.accept().await {
-            Ok((mut stream, addr)) => {
-                if args.verbose {
-                    eprintln!("Client connected from {}", addr)
-                }
-                run_tcpstream_tasks(&mut stream).await?
-            }
-            Err(_) => {}
-        }
-        Ok(())
+    // UDP stuff
+    if args.verbose {
+        eprintln!("Listening udp socket at {:?}", serveraddr);
     }
+
+    // Some dirty hacks here, since async_std::net::UdpSocket doesn't implement try_clone(),
+    // we'll first create non-async UDP socket, clone it and turn into async sockets once
+    // we have an active peer.
+    let udp_socket = std::net::UdpSocket::bind(serveraddr)?;
+    let mut buf = [0_u8; BUFFER_SIZE];
+
+    // First come first served
+    let (bytes, peer) = udp_socket.recv_from(&mut buf)?;
+    if args.verbose {
+        eprintln!("Peer connected at {:?}", peer)
+    }
+    io::stdout().write_all(&buf[0..bytes]).await?;
+    io::stdout().flush().await?;
+
+    let cloned_socket = udp_socket.try_clone()?;
+    let async_socket = UdpSocket::from(udp_socket);
+    let async_clone = UdpSocket::from(cloned_socket);
+
+    let stdin_task = stdin_to_udpsocket(async_socket, peer).fuse();
+    let stdout_task = udpsocket_to_stdout(async_clone).fuse();
+
+    pin_mut!(stdin_task, stdout_task);
+    select! {
+        _res = stdin_task => _res?,
+        _res = stdout_task => _res?,
+    }
+    return Ok(());
+}
+
+async fn run_tcp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
+    let args = Args::parse();
+    let serveraddr = format!("{}:{}", bind_addr, bind_port);
+    if args.verbose {
+        eprintln!("Listening to TCP socket at {}", serveraddr)
+    }
+    let listener = TcpListener::bind(serveraddr).await?;
+    match listener.accept().await {
+        Ok((mut stream, addr)) => {
+            if args.verbose {
+                eprintln!("Client connected from {}", addr)
+            }
+            run_tcpstream_tasks(&mut stream).await?
+        }
+        Err(_) => {}
+    }
+    Ok(())
 }
 
 async fn stdin_to_stream(mut stream: TcpStream) -> Result<()> {
