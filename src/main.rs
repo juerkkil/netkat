@@ -1,12 +1,6 @@
-use async_std::io::{self};
-use async_std::net::{SocketAddr, UdpSocket};
-use futures::{AsyncReadExt, AsyncWriteExt};
+use async_std::net::{TcpStream, UdpSocket};
 
 use clap::Parser;
-
-mod stdio;
-mod tcp;
-mod udp;
 
 mod stdio;
 mod tcp;
@@ -38,7 +32,7 @@ struct Args {
     verbose: bool,
 }
 
-pub enum SocketType {
+pub enum Socket {
     TCP(TcpStream),
     UDP(UdpSocket),
 }
@@ -90,40 +84,5 @@ fn main() -> Result<()> {
         }
     }
 
-    Ok(())
-}
-
-async fn stdin_to_udpsocket(socket: UdpSocket, peer: SocketAddr) -> Result<()> {
-    let mut buf = [0u8; BUFFER_SIZE];
-
-    loop {
-        let read_bytes = io::stdin().read(&mut buf).await.unwrap();
-        match read_bytes {
-            1_usize..=usize::MAX => {
-                socket.send_to(&buf[0..read_bytes], peer).await?;
-            }
-            _ => break,
-        }
-    }
-    Ok(())
-}
-
-async fn udpsocket_to_stdout(socket: UdpSocket) -> Result<()> {
-    let mut stdout = io::stdout();
-    let mut buf = [0u8; BUFFER_SIZE];
-    loop {
-        let (bytes, _peer) = socket.recv_from(&mut buf).await?;
-        match bytes {
-            1_usize..=usize::MAX => {
-                stdout.write_all(&buf[0..bytes]).await?;
-                stdout.flush().await?;
-            }
-            _ => {
-                // Most likely reached EOF
-                stdout.flush().await?;
-                break;
-            }
-        }
-    }
     Ok(())
 }

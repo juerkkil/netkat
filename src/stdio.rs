@@ -1,8 +1,8 @@
 use async_std::io::{self};
-use async_std::net::TcpStream;
+use async_std::net::{SocketAddr, TcpStream, UdpSocket};
 use futures::{AsyncReadExt, AsyncWriteExt};
 
-use crate::SocketType;
+use crate::Socket;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -12,19 +12,33 @@ pub async fn stdin_to_stream(mut stream: TcpStream) -> Result<()> {
     Ok(())
 }
 
-pub async fn stream_to_stdout(mut socket: crate::SocketType) -> Result<()> {
+pub async fn stdin_to_udpsocket(socket: UdpSocket, peer: SocketAddr) -> Result<()> {
+    let mut buf = [0u8; crate::BUFFER_SIZE];
+
+    loop {
+        let read_bytes = io::stdin().read(&mut buf).await.unwrap();
+        match read_bytes {
+            1_usize..=usize::MAX => {
+                socket.send_to(&buf[0..read_bytes], peer).await?;
+            }
+            _ => break,
+        }
+    }
+    Ok(())
+}
+
+// Generic implementation for udp/tcp to avoid duplicate code
+// Socket `socket` is an enum over async TcpStream and UdpSocket
+pub async fn socket_to_stdout(mut socket: Socket) -> Result<()> {
     let mut stdout = io::stdout();
-    // we cloud simply use io::copy to pipe the tcpstream to stdout. However, this doesn't flush
-    // stdout unless there is a newline
-    //  let _res = io::copy(&mut stream, &mut stdout).await;
     let mut buf = [0u8; crate::BUFFER_SIZE];
     loop {
         let (bytes_read, _peer) = match socket {
-            SocketType::TCP(ref mut stream) => (
+            Socket::TCP(ref mut stream) => (
                 stream.read(&mut buf).await.unwrap(),
                 stream.peer_addr().unwrap(),
             ),
-            SocketType::UDP(ref udp_socket) => udp_socket.recv_from(&mut buf).await?,
+            Socket::UDP(ref udp_socket) => udp_socket.recv_from(&mut buf).await?,
         };
         match bytes_read {
             1_usize..=usize::MAX => {
