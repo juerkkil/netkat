@@ -40,12 +40,12 @@ fn main() -> Result<()> {
         match args.port {
             Some(1_u16..=u16::MAX) => {
                 if args.udp {
-                    return async_std::task::block_on(run_tcp_server(
+                    return async_std::task::block_on(run_udp_server(
                         &args.hostname.unwrap(),
                         args.port.unwrap(),
                     ));
                 } else {
-                    return async_std::task::block_on(run_udp_server(
+                    return async_std::task::block_on(run_tcp_server(
                         &args.hostname.unwrap(),
                         args.port.unwrap(),
                     ));
@@ -90,7 +90,7 @@ async fn run_udp_client(hostname: &str, target_port: u16) -> Result<()> {
     let async_socket = UdpSocket::from(udp_socket);
     let async_clone = UdpSocket::from(cloned_socket);
     let target = format!("{}:{}", hostname, target_port);
-    let server = target.to_socket_addrs().unwrap().next().expect("foo");
+    let server = target.to_socket_addrs().await?.next().expect("foo");
 
     let stdin_task = stdin_to_udpsocket(async_socket, server).fuse();
     let stdout_task = udpsocket_to_stdout(async_clone).fuse();
