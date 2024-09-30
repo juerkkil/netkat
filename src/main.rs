@@ -1,10 +1,12 @@
 use async_std::io::{self};
-
-use async_std::net::{SocketAddr, TcpStream, UdpSocket};
+use async_std::net::{SocketAddr, UdpSocket};
+use futures::{AsyncReadExt, AsyncWriteExt};
 
 use clap::Parser;
 
-use futures::{AsyncReadExt, AsyncWriteExt};
+mod stdio;
+mod tcp;
+mod udp;
 
 mod stdio;
 mod tcp;
