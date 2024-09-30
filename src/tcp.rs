@@ -34,7 +34,8 @@ pub async fn run_tcp_client(hostname: &str, target_port: u16) -> Result<()> {
 
 async fn run_tcpstream_tasks(stream: &mut TcpStream) -> Result<()> {
     let stdin_task = stdio::stdin_to_stream(stream.clone()).fuse();
-    let stdout_task = stdio::stream_to_stdout(stream.clone()).fuse();
+    let socket = crate::SocketType::TCP(stream.clone());
+    let stdout_task = stdio::stream_to_stdout(socket).fuse();
 
     // If either of the tasks (reading or writing the stream) is completed, we return without
     // waiting the other one to finish.

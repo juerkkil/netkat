@@ -1,8 +1,10 @@
 use async_std::io::{self};
-use async_std::net::{SocketAddr, UdpSocket};
-use futures::{AsyncReadExt, AsyncWriteExt};
+
+use async_std::net::{SocketAddr, TcpStream, UdpSocket};
 
 use clap::Parser;
+
+use futures::{AsyncReadExt, AsyncWriteExt};
 
 mod stdio;
 mod tcp;
@@ -32,6 +34,11 @@ struct Args {
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
+}
+
+pub enum SocketType {
+    TCP(TcpStream),
+    UDP(UdpSocket),
 }
 
 fn main() -> Result<()> {
