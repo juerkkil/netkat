@@ -2,9 +2,7 @@ use async_std::io::{self};
 use async_std::net::{SocketAddr, TcpStream, UdpSocket};
 use futures::{AsyncReadExt, AsyncWriteExt};
 
-use crate::Socket;
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+use crate::{Result, Socket};
 
 pub async fn stdin_to_stream(mut stream: TcpStream) -> Result<()> {
     let mut stdin = io::stdin();

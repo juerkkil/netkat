@@ -5,13 +5,13 @@ use futures::{future::FutureExt, pin_mut, select};
 
 use async_std::net::{ToSocketAddrs, UdpSocket};
 
-use crate::stdio;
+use crate::{stdio, Args, Result, Socket};
 
-pub async fn run_udp_client(hostname: &str, target_port: u16) -> crate::Result<()> {
+pub async fn run_udp_client(hostname: &str, target_port: u16) -> Result<()> {
     let udp_socket = std::net::UdpSocket::bind("127.0.0.1:0")?;
     let cloned_socket = udp_socket.try_clone()?;
     let async_socket = UdpSocket::from(udp_socket);
-    let async_clone = crate::Socket::UDP(UdpSocket::from(cloned_socket));
+    let async_clone = Socket::UDP(UdpSocket::from(cloned_socket));
     let target = format!("{}:{}", hostname, target_port);
     let server = target.to_socket_addrs().await.unwrap().next();
 
@@ -26,8 +26,8 @@ pub async fn run_udp_client(hostname: &str, target_port: u16) -> crate::Result<(
     Ok(())
 }
 
-pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> crate::Result<()> {
-    let args = crate::Args::parse();
+pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
+    let args = Args::parse();
     let serveraddr = format!("{}:{}", bind_addr, bind_port);
 
     // UDP stuff
@@ -52,7 +52,7 @@ pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> crate::Result<()
     let cloned_socket = udp_socket.try_clone()?;
     let async_socket = UdpSocket::from(udp_socket);
 
-    let async_clone = crate::Socket::UDP(UdpSocket::from(cloned_socket));
+    let async_clone = Socket::UDP(UdpSocket::from(cloned_socket));
 
     let stdin_task = stdio::stdin_to_udpsocket(async_socket, peer).fuse();
     let stdout_task = stdio::socket_to_stdout(async_clone).fuse();
