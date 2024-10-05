@@ -13,9 +13,12 @@ pub async fn run_udp_client(hostname: &str, target_port: u16) -> Result<()> {
     let async_socket = UdpSocket::from(udp_socket);
     let async_clone = Socket::UDP(UdpSocket::from(cloned_socket));
     let target = format!("{}:{}", hostname, target_port);
-    let server = target.to_socket_addrs().await?.next();
+    let server = match target.to_socket_addrs().await?.next() {
+        Some(server) => server,
+        None => return Err("No socket addr".into()),
+    };
 
-    let stdin_task = stdio::stdin_to_udpsocket(async_socket, server.expect("fail")).fuse();
+    let stdin_task = stdio::stdin_to_udpsocket(async_socket, server).fuse();
     let stdout_task = stdio::socket_to_stdout(async_clone).fuse();
 
     pin_mut!(stdin_task, stdout_task);
@@ -62,5 +65,5 @@ pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
         _res = stdin_task => _res?,
         _res = stdout_task => _res?,
     }
-    return Ok(());
+    Ok(())
 }
