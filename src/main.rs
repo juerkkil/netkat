@@ -2,7 +2,7 @@ use async_std::net::{TcpStream, UdpSocket};
 
 use clap::Parser;
 
-mod stdio;
+mod std_socket_io;
 mod tcp;
 mod udp;
 
@@ -39,50 +39,43 @@ pub enum Socket {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    let hostname = match args.hostname {
+        Some(ref hostname) => hostname,
+        None => {
+            eprintln!("No hostname given!");
+            std::process::exit(1);
+        }
+    };
+    let port = match args.port {
+        Some(port) if port > 0_u16 && port <= u16::MAX => port,
+        None => {
+            eprintln!("No port given");
+            std::process::exit(1);
+        }
+        _ => {
+            eprintln!("Invalid port number");
+            std::process::exit(1);
+        }
+    };
+
+    let res: Result<()>;
     if args.listen {
-        match args.port {
-            Some(1_u16..=u16::MAX) => {
-                if args.udp {
-                    return async_std::task::block_on(udp::run_udp_server(
-                        &args.hostname.unwrap(),
-                        args.port.unwrap(),
-                    ));
-                } else {
-                    return async_std::task::block_on(tcp::run_tcp_server(
-                        &args.hostname.unwrap(),
-                        args.port.unwrap(),
-                    ));
-                }
-            }
-            Some(_) => {
-                eprintln!("Invalid port number");
-            }
-            None => {
-                eprintln!("No source port provided")
-            }
+        if args.udp {
+            res = async_std::task::block_on(udp::run_udp_server(hostname, port));
+        } else {
+            res = async_std::task::block_on(tcp::run_tcp_server(hostname, port));
         }
     } else {
-        /* Check the necessary args for client mode */
-        if args.hostname.is_none() {
-            eprintln!("No hostname given!");
-            return Ok(());
-        }
-        if args.port.is_none() {
-            eprintln!("No port given");
-            return Ok(());
-        }
         if args.udp {
-            return async_std::task::block_on(udp::run_udp_client(
-                &args.hostname.unwrap(),
-                args.port.unwrap(),
-            ));
+            res = async_std::task::block_on(udp::run_udp_client(hostname, port));
         } else {
-            return async_std::task::block_on(tcp::run_tcp_client(
-                &args.hostname.unwrap(),
-                args.port.unwrap(),
-            ));
+            res = async_std::task::block_on(tcp::run_tcp_client(hostname, port));
         }
     }
-
-    Ok(())
+    if res.is_ok() {
+        return Ok(());
+    } else {
+        eprintln!("Error: {}", res.unwrap_err().to_string());
+        std::process::exit(1);
+    }
 }

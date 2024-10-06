@@ -3,7 +3,7 @@ use async_std::net::{TcpListener, TcpStream};
 use clap::Parser;
 use futures::{future::FutureExt, pin_mut, select};
 
-use crate::{stdio, Args, Result, Socket};
+use crate::{std_socket_io, Args, Result, Socket};
 
 pub async fn run_tcp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
     let args = Args::parse();
@@ -31,9 +31,9 @@ pub async fn run_tcp_client(hostname: &str, target_port: u16) -> Result<()> {
 }
 
 async fn run_tcpstream_tasks(stream: &mut TcpStream) -> Result<()> {
-    let stdin_task = stdio::stdin_to_stream(stream.clone()).fuse();
+    let stdin_task = std_socket_io::stdin_to_stream(stream.clone()).fuse();
     let socket = Socket::TCP(stream.clone());
-    let stdout_task = stdio::socket_to_stdout(socket).fuse();
+    let stdout_task = std_socket_io::socket_to_stdout(socket).fuse();
 
     // If either of the tasks (reading or writing the stream) is completed, we return without
     // waiting the other one to finish.
