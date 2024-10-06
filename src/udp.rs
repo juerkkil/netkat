@@ -5,7 +5,7 @@ use futures::{future::FutureExt, pin_mut, select};
 
 use async_std::net::{ToSocketAddrs, UdpSocket};
 
-use crate::{stdio, Args, Result, Socket};
+use crate::{std_socket_io, Args, Result, Socket};
 
 pub async fn run_udp_client(hostname: &str, target_port: u16) -> Result<()> {
     let udp_socket = std::net::UdpSocket::bind("127.0.0.1:0")?;
@@ -18,8 +18,8 @@ pub async fn run_udp_client(hostname: &str, target_port: u16) -> Result<()> {
         None => return Err("No socket addr".into()),
     };
 
-    let stdin_task = stdio::stdin_to_udpsocket(async_socket, server).fuse();
-    let stdout_task = stdio::socket_to_stdout(async_clone).fuse();
+    let stdin_task = std_socket_io::stdin_to_udpsocket(async_socket, server).fuse();
+    let stdout_task = std_socket_io::socket_to_stdout(async_clone).fuse();
 
     pin_mut!(stdin_task, stdout_task);
     select! {
@@ -57,13 +57,13 @@ pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
 
     let async_clone = Socket::UDP(UdpSocket::from(cloned_socket));
 
-    let stdin_task = stdio::stdin_to_udpsocket(async_socket, peer).fuse();
-    let stdout_task = stdio::socket_to_stdout(async_clone).fuse();
+    let stdin_task = std_socket_io::stdin_to_udpsocket(async_socket, peer).fuse();
+    let stdout_task = std_socket_io::socket_to_stdout(async_clone).fuse();
 
     pin_mut!(stdin_task, stdout_task);
     select! {
         _res = stdin_task => _res?,
         _res = stdout_task => _res?,
     }
-    Ok(())
+    return Ok(());
 }

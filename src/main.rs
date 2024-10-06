@@ -2,7 +2,7 @@ use async_std::net::{TcpStream, UdpSocket};
 
 use clap::Parser;
 
-mod stdio;
+mod std_socket_io;
 mod tcp;
 mod udp;
 
@@ -57,17 +57,25 @@ fn main() -> Result<()> {
             std::process::exit(1);
         }
     };
+
+    let res: Result<()>;
     if args.listen {
         if args.udp {
-            return async_std::task::block_on(udp::run_udp_server(hostname, port));
+            res = async_std::task::block_on(udp::run_udp_server(hostname, port));
         } else {
-            return async_std::task::block_on(tcp::run_tcp_server(hostname, port));
+            res = async_std::task::block_on(tcp::run_tcp_server(hostname, port));
         }
     } else {
         if args.udp {
-            return async_std::task::block_on(udp::run_udp_client(hostname, port));
+            res = async_std::task::block_on(udp::run_udp_client(hostname, port));
         } else {
-            return async_std::task::block_on(tcp::run_tcp_client(hostname, port));
+            res = async_std::task::block_on(tcp::run_tcp_client(hostname, port));
         }
+    }
+    if res.is_ok() {
+        return Ok(());
+    } else {
+        eprintln!("Error: {}", res.unwrap_err().to_string());
+        std::process::exit(1);
     }
 }
