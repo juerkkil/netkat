@@ -2,9 +2,7 @@ use async_std::io::{self};
 use async_std::net::{SocketAddr, TcpStream, UdpSocket};
 use futures::{AsyncReadExt, AsyncWriteExt};
 
-use clap::Parser;
-
-use crate::{Args, Result, Socket};
+use crate::{Result, Socket};
 
 pub async fn stdin_to_stream(mut stream: TcpStream) -> Result<()> {
     let mut stdin = io::stdin();
@@ -13,24 +11,17 @@ pub async fn stdin_to_stream(mut stream: TcpStream) -> Result<()> {
 }
 
 pub async fn stdin_to_udpsocket(socket: UdpSocket, peer: SocketAddr) -> Result<()> {
-    let args = Args::parse();
     let mut buf = [0u8; crate::BUFFER_SIZE];
 
     loop {
         let read_bytes = io::stdin().read(&mut buf).await?;
-        let bytes_sent = match read_bytes {
-            1_usize..=usize::MAX => socket.send_to(&buf[0..read_bytes], peer).await,
+        let sent_bytes = match read_bytes {
+            1_usize..=usize::MAX => socket.send_to(&buf[0..read_bytes], peer).await?,
             _ => break,
         };
-        match bytes_sent {
-            Ok(1_usize..=usize::MAX) => {}
-            Err(_err) => {
-                if args.verbose {
-                    eprintln!("Connection failed: {:?}", _err);
-                }
-                break;
-            }
-            _ => break,
+        if sent_bytes == 0 {
+            // not sure whether this can happen but just in case
+            break;
         }
     }
     Ok(())
