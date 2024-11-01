@@ -1,3 +1,5 @@
+use std::net::ToSocketAddrs;
+
 use async_std::net::{TcpListener, TcpStream};
 
 use clap::Parser;
@@ -24,9 +26,28 @@ pub async fn run_tcp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
     Ok(())
 }
 
-pub async fn run_tcp_client(hostname: &str, target_port: u16) -> Result<()> {
+pub async fn run_tcp_client(hostname: &str, target_port: u16, timeout: Option<u64>) -> Result<()> {
     let target = format!("{}:{}", hostname, target_port);
-    let mut stream = TcpStream::connect(target).await?;
+    let target_next = match target.to_socket_addrs()?.next() {
+        Some(t) => t,
+        None => return Err("Empty oscket addr".into()),
+    };
+
+    // A bit of dirty hack again, connect_timeout not implemented in async_std::net::TcpStream, thus we first
+    // create just a "normal" sync TcpStream and convert it into async.
+    let mut stream = match timeout {
+        Some(timeout) => {
+            let sync_stream = std::net::TcpStream::connect_timeout(
+                &target_next,
+                std::time::Duration::from_secs(timeout),
+            )?;
+            TcpStream::from(sync_stream)
+        }
+        None => {
+            // Let's go with system's default timeout
+            TcpStream::connect(target).await?
+        }
+    };
     run_tcpstream_tasks(&mut stream).await
 }
 
