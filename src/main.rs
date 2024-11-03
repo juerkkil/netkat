@@ -27,6 +27,10 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     udp: bool,
 
+    /// Timeout in seconds
+    #[arg(short, long)]
+    timeout: Option<u64>,
+
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
@@ -69,7 +73,7 @@ fn main() -> Result<()> {
         if args.udp {
             res = async_std::task::block_on(udp::run_udp_client(hostname, port));
         } else {
-            res = async_std::task::block_on(tcp::run_tcp_client(hostname, port));
+            res = async_std::task::block_on(tcp::run_tcp_client(hostname, port, args.timeout));
         }
     }
     if res.is_ok() {
