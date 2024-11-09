@@ -1,4 +1,7 @@
-use async_std::net::{TcpStream, UdpSocket};
+use async_std::{
+    net::{TcpStream, UdpSocket},
+    os::unix::net::{UnixDatagram, UnixStream},
+};
 
 use clap::Parser;
 
@@ -13,8 +16,8 @@ const BUFFER_SIZE: usize = 8192;
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Hostname (either destination address or the address to bind the listener)
-    hostname: Option<String>,
+    /// Address (either destination address or the address to bind the listener)
+    address: Option<String>,
 
     /// Port - either source or target port depending on mode of operation
     port: Option<u16>,
@@ -27,9 +30,13 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     udp: bool,
 
-    /// Timeout in seconds
+    /// Timeout in seconds (only TCP)
     #[arg(short, long)]
     timeout: Option<u64>,
+
+    /// Use UNIX domain socket instead of Internet domain socket
+    #[arg(short = 'U')]
+    unix_socket: bool,
 
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
@@ -39,22 +46,27 @@ struct Args {
 pub enum Socket {
     TCP(TcpStream),
     UDP(UdpSocket),
+    UnixSocketStream(UnixStream),
+    UnixSocketDatagram(UnixDatagram),
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let hostname = match args.hostname {
-        Some(ref hostname) => hostname,
+    let address = match args.address {
+        Some(ref address) => address,
         None => {
-            eprintln!("No hostname given!");
+            eprintln!("No address given!");
             std::process::exit(1);
         }
     };
     let port = match args.port {
         Some(port) if port > 0_u16 && port <= u16::MAX => port,
         None => {
-            eprintln!("No port given");
-            std::process::exit(1);
+            if !args.unix_socket {
+                eprintln!("No port given");
+                std::process::exit(1);
+            }
+            0
         }
         _ => {
             eprintln!("Invalid port number");
@@ -65,15 +77,17 @@ fn main() -> Result<()> {
     let res: Result<()>;
     if args.listen {
         if args.udp {
-            res = async_std::task::block_on(udp::run_udp_server(hostname, port));
+            res = async_std::task::block_on(udp::run_udp_server(address, port));
+        } else if args.unix_socket {
+            res = async_std::task::block_on(tcp::run_unix_socket_server(address));
         } else {
-            res = async_std::task::block_on(tcp::run_tcp_server(hostname, port));
+            res = async_std::task::block_on(tcp::run_tcp_server(address, port));
         }
     } else {
         if args.udp {
-            res = async_std::task::block_on(udp::run_udp_client(hostname, port));
+            res = async_std::task::block_on(udp::run_udp_client(address, port));
         } else {
-            res = async_std::task::block_on(tcp::run_tcp_client(hostname, port, args.timeout));
+            res = async_std::task::block_on(tcp::run_tcp_client(address, port, args.timeout));
         }
     }
     if res.is_ok() {
