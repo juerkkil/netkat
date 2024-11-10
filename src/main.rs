@@ -8,6 +8,7 @@ use clap::Parser;
 mod std_socket_io;
 mod tcp;
 mod udp;
+mod unixstream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -16,7 +17,7 @@ const BUFFER_SIZE: usize = 8192;
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Address (either destination address or the address to bind the listener)
+    /// Hostname (either destination address or the address to bind the listener)
     address: Option<String>,
 
     /// Port - either source or target port depending on mode of operation
@@ -79,7 +80,7 @@ fn main() -> Result<()> {
         if args.udp {
             res = async_std::task::block_on(udp::run_udp_server(address, port));
         } else if args.unix_socket {
-            res = async_std::task::block_on(tcp::run_unix_socket_server(address));
+            res = async_std::task::block_on(unixstream::run_unix_socket_server(address));
         } else {
             res = async_std::task::block_on(tcp::run_tcp_server(address, port));
         }
