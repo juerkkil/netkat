@@ -37,7 +37,7 @@ async fn run_unixstream_tasks(stream: UnixStream) -> Result<()> {
     let stdout_task = std_socket_io::socket_to_stdout(socket).fuse();
     pin_mut!(stdin_task, stdout_task);
     select! {
-        _res = stdin_task => _res ,
+        _res = stdin_task => _res,
         _res = stdout_task => _res,
     }
 }
