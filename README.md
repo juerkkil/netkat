@@ -1,20 +1,21 @@
 # netkat
-A simple netcat clone written in Rust. Supports IPv4/IPv6 and TCP/UDP. Concurrency implemented using async model.
+A simple netcat clone written in Rust. On network layer supports IPv4/IPv6 and Unix Domain sockets, and on transport layer TCP/UDP. Concurrency implemented using async model.
 
 ## Usage
 
 ```
 # ./netkat --help
-Usage: netkat [OPTIONS] [HOSTNAME] [PORT]
+Usage: netkat [OPTIONS] [ADDRESS] [PORT]
 
 Arguments:
-  [HOSTNAME]  Hostname (either destination address or the address to bind the listener)
-  [PORT]      Port - either source or target port depending on mode of operation
+  [ADDRESS]  Hostname (either destination address or the address to bind the listener)
+  [PORT]     Port - either source or target port depending on mode of operation
 
 Options:
   -l, --listen             Listen to incoming connection
   -u, --udp                Use UDP instead of TCP
-  -t, --timeout <TIMEOUT>  Timeout in seconds
+  -t, --timeout <TIMEOUT>  Connection timeout in seconds (only TCP)
+  -U                       Use UNIX domain socket instead of Internet domain socket
   -v, --verbose            Verbose output
   -h, --help               Print help
   -V, --version            Print version

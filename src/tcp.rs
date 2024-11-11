@@ -7,6 +7,8 @@ use futures::{future::FutureExt, pin_mut, select};
 
 use crate::{std_socket_io, Args, Result, Socket};
 
+// // pub async fn run_server(bind_addr: &str, bind_port: Option<u16>) -> Result<()> {}
+
 pub async fn run_tcp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
     let args = Args::parse();
     let serveraddr = format!("{}:{}", bind_addr, bind_port);
@@ -30,7 +32,7 @@ pub async fn run_tcp_client(hostname: &str, target_port: u16, timeout: Option<u6
     let target = format!("{}:{}", hostname, target_port);
     let target_next = match target.to_socket_addrs()?.next() {
         Some(t) => t,
-        None => return Err("Empty oscket addr".into()),
+        None => return Err("Empty socket addr".into()),
     };
 
     // A bit of dirty hack again, connect_timeout not implemented in async_std::net::TcpStream, thus we first
@@ -52,7 +54,7 @@ pub async fn run_tcp_client(hostname: &str, target_port: u16, timeout: Option<u6
 }
 
 async fn run_tcpstream_tasks(stream: &mut TcpStream) -> Result<()> {
-    let stdin_task = std_socket_io::stdin_to_stream(stream.clone()).fuse();
+    let stdin_task = std_socket_io::stdin_to_stream(Socket::TCP(stream.clone())).fuse();
     let socket = Socket::TCP(stream.clone());
     let stdout_task = std_socket_io::socket_to_stdout(socket).fuse();
 
