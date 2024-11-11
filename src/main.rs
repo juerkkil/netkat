@@ -10,7 +10,7 @@ mod tcp;
 mod udp;
 mod unixstream;
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
 const BUFFER_SIZE: usize = 8192;
 
@@ -87,6 +87,8 @@ fn main() -> Result<()> {
     } else {
         if args.udp {
             res = async_std::task::block_on(udp::run_udp_client(address, port));
+        } else if args.unix_socket {
+            res = async_std::task::block_on(unixstream::run_unix_socket_client(address));
         } else {
             res = async_std::task::block_on(tcp::run_tcp_client(address, port, args.timeout));
         }

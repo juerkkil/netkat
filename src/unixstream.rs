@@ -4,18 +4,30 @@ use futures::{future::FutureExt, pin_mut, select};
 
 use crate::{std_socket_io, Args, Result, Socket};
 
-pub async fn run_unix_socket_server(fh: &str) -> Result<()> {
+pub async fn run_unix_socket_server(addr: &str) -> Result<()> {
     let args = Args::parse();
     if args.verbose {
-        eprintln!("Listening to unix socket at {}", fh)
+        eprintln!("Listening to unix socket at {}", addr)
     }
 
-    let listener = UnixListener::bind(fh).await?;
-    match listener.accept().await {
-        Ok((stream, _addr)) => run_unixstream_tasks(stream).await?,
-        Err(_) => {}
+    let listener = UnixListener::bind(addr).await?;
+    let (sock, peer) = listener.accept().await?;
+    if args.verbose {
+        eprintln!("Got connection from {:?}", peer);
     }
-    Ok(())
+    run_unixstream_tasks(sock).await
+}
+
+pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
+    let args = Args::parse();
+    if args.verbose {
+        eprintln!("Connecting to Unix socket at {}", addr);
+    }
+    let sock = UnixStream::connect(addr).await?;
+    if args.verbose {
+        eprintln!("Successfully connected to {}", addr)
+    }
+    run_unixstream_tasks(sock).await
 }
 
 async fn run_unixstream_tasks(stream: UnixStream) -> Result<()> {
