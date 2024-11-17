@@ -16,6 +16,35 @@ pub async fn stdin_to_stream(mut stream: Socket) -> Result<()> {
     Ok(())
 }
 
+pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
+    let mut stdin = io::stdin();
+    let _res = match sock {
+        Socket::TCP(ref mut stream) => io::copy(&mut stdin, stream).await?,
+        Socket::UDP(ref udp_connection) => {
+            let mut buf = [0u8; crate::BUFFER_SIZE];
+            loop {
+                let read_bytes = io::stdin().read(&mut buf).await?;
+                let sent_bytes = match read_bytes {
+                    1_usize..=usize::MAX => {
+                        udp_connection
+                            .socket
+                            .send_to(&buf[0..read_bytes], udp_connection.peer)
+                            .await?
+                    }
+                    _ => break,
+                };
+                if sent_bytes == 0 {
+                    break;
+                }
+            }
+            0
+        }
+        Socket::UnixSocketStream(ref mut stream) => io::copy(&mut stdin, stream).await?,
+        Socket::UnixSocketDatagram(ref _udp_connection) => todo!(),
+    };
+    Ok(())
+}
+
 pub async fn stdin_to_udpsocket(socket: UdpSocket, peer: SocketAddr) -> Result<()> {
     let mut buf = [0u8; crate::BUFFER_SIZE];
 
@@ -41,7 +70,7 @@ pub async fn socket_to_stdout(mut socket: Socket) -> Result<()> {
     loop {
         let bytes_read = match socket {
             Socket::TCP(ref mut stream) => stream.read(&mut buf).await?,
-            Socket::UDP(ref udp_socket) => udp_socket.recv_from(&mut buf).await?.0,
+            Socket::UDP(ref udp_socket) => udp_socket.socket.recv_from(&mut buf).await?.0,
             Socket::UnixSocketStream(ref mut stream) => stream.read(&mut buf).await?,
             Socket::UnixSocketDatagram(_a) => todo!(),
         };

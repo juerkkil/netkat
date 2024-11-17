@@ -1,5 +1,5 @@
 use async_std::{
-    net::{TcpStream, UdpSocket},
+    net::{SocketAddr, TcpStream, UdpSocket},
     os::unix::net::{UnixDatagram, UnixStream},
 };
 
@@ -44,9 +44,14 @@ struct Args {
     verbose: bool,
 }
 
+pub struct UdpConnection {
+    socket: UdpSocket,
+    peer: SocketAddr,
+}
+
 pub enum Socket {
     TCP(TcpStream),
-    UDP(UdpSocket),
+    UDP(UdpConnection),
     UnixSocketStream(UnixStream),
     UnixSocketDatagram(UnixDatagram),
 }

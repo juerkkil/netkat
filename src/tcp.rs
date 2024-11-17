@@ -54,7 +54,7 @@ pub async fn run_tcp_client(hostname: &str, target_port: u16, timeout: Option<u6
 }
 
 async fn run_tcpstream_tasks(stream: &mut TcpStream) -> Result<()> {
-    let stdin_task = std_socket_io::stdin_to_stream(Socket::TCP(stream.clone())).fuse();
+    let stdin_task = std_socket_io::stdin_to_socket(Socket::TCP(stream.clone())).fuse();
     let socket = Socket::TCP(stream.clone());
     let stdout_task = std_socket_io::socket_to_stdout(socket).fuse();
 

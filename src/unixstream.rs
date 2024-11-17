@@ -15,7 +15,9 @@ pub async fn run_unix_socket_server(addr: &str) -> Result<()> {
     if args.verbose {
         eprintln!("Got connection from {:?}", peer);
     }
-    run_unixstream_tasks(sock).await
+    let sock_write = Socket::UnixSocketStream(sock.clone());
+    let sock_read = Socket::UnixSocketStream(sock);
+    run_unixstream_tasks(sock_read, sock_write).await
 }
 
 pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
@@ -27,14 +29,13 @@ pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
     if args.verbose {
         eprintln!("Successfully connected to {}", addr)
     }
-    run_unixstream_tasks(sock).await
+    let wsock = Socket::UnixSocketStream(sock.clone());
+    run_unixstream_tasks(Socket::UnixSocketStream(sock), wsock).await
 }
 
-async fn run_unixstream_tasks(stream: UnixStream) -> Result<()> {
-    let socket = Socket::UnixSocketStream(stream.clone());
-    let socket2 = Socket::UnixSocketStream(stream);
-    let stdin_task = std_socket_io::stdin_to_stream(socket2).fuse();
-    let stdout_task = std_socket_io::socket_to_stdout(socket).fuse();
+async fn run_unixstream_tasks(rsock: Socket, wsock: Socket) -> Result<()> {
+    let stdin_task = std_socket_io::stdin_to_socket(wsock).fuse();
+    let stdout_task = std_socket_io::socket_to_stdout(rsock).fuse();
     pin_mut!(stdin_task, stdout_task);
     select! {
         _res = stdin_task => _res,
