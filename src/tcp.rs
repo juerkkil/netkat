@@ -46,10 +46,7 @@ pub async fn run_tcp_client(hostname: &str, target_port: u16, timeout: Option<u6
             )?;
             TcpStream::from(sync_stream)
         }
-        None => {
-            // Let's go with system's default timeout
-            TcpStream::connect(target).await?
-        }
+        None => TcpStream::connect(target).await?, // No timeout defined
     };
     let write_sock = Socket::TCP(stream.clone());
     let read_sock = Socket::TCP(stream);

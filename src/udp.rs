@@ -1,7 +1,6 @@
 use async_std::io::{self};
 use clap::Parser;
 use futures::AsyncWriteExt;
-use futures::{future::FutureExt, pin_mut, select};
 
 use async_std::net::{ToSocketAddrs, UdpSocket};
 
@@ -24,18 +23,7 @@ pub async fn run_udp_client(hostname: &str, target_port: u16) -> Result<()> {
         socket: UdpSocket::from(cloned_socket),
         peer: server,
     };
-    let conn_read = Socket::UDP(udp_conn_read);
-    let conn_write = Socket::UDP(udp_conn_write);
-
-    let stdin_task = std_socket_io::stdin_to_socket(conn_write).fuse();
-    let stdout_task = std_socket_io::socket_to_stdout(conn_read).fuse();
-
-    pin_mut!(stdin_task, stdout_task);
-    select! {
-        _res = stdin_task => _res?,
-        _res = stdout_task => _res?,
-    }
-    Ok(())
+    std_socket_io::run_async_tasks(Socket::UDP(udp_conn_read), Socket::UDP(udp_conn_write)).await
 }
 
 pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
@@ -47,9 +35,6 @@ pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
         eprintln!("Listening udp socket at {:?}", serveraddr);
     }
 
-    // Some dirty hacks here, since async_std::net::UdpSocket doesn't implement try_clone(),
-    // we'll first create non-async UDP socket, clone it and turn into async sockets once
-    // we have an active peer.
     let udp_socket = std::net::UdpSocket::bind(serveraddr)?;
     let mut buf = [0_u8; crate::BUFFER_SIZE];
 
@@ -71,16 +56,5 @@ pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
         socket: UdpSocket::from(cloned_socket),
         peer: peer,
     };
-    let conn_read = Socket::UDP(udp_conn_read);
-    let conn_write = Socket::UDP(udp_conn_write);
-
-    let stdin_task = std_socket_io::stdin_to_socket(conn_write).fuse();
-    let stdout_task = std_socket_io::socket_to_stdout(conn_read).fuse();
-
-    pin_mut!(stdin_task, stdout_task);
-    select! {
-        _res = stdin_task => _res?,
-        _res = stdout_task => _res?,
-    }
-    return Ok(());
+    std_socket_io::run_async_tasks(Socket::UDP(udp_conn_read), Socket::UDP(udp_conn_write)).await
 }

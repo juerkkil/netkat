@@ -4,7 +4,7 @@ use futures::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{Result, Socket};
 
-pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
+async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
     let mut stdin = io::stdin();
     let _res = match sock {
         Socket::TCP(ref mut stream) => io::copy(&mut stdin, stream).await?,
@@ -12,7 +12,6 @@ pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
             let mut buf = [0u8; crate::BUFFER_SIZE];
             loop {
                 let read_bytes = io::stdin().read(&mut buf).await?;
-                eprintln!("Read {}", read_bytes);
                 let sent_bytes = match read_bytes {
                     1_usize..=usize::MAX => {
                         udp_connection
@@ -22,7 +21,6 @@ pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
                     }
                     _ => break,
                 };
-                eprintln!("Sent {}", sent_bytes);
                 if sent_bytes == 0 {
                     break;
                 }
@@ -37,7 +35,7 @@ pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
 
 // Generic implementation for udp/tcp to avoid duplicate code
 // Socket `socket` is an enum over async TcpStream, UdpSocket and Unix sockets
-pub async fn socket_to_stdout(mut socket: Socket) -> Result<()> {
+async fn socket_to_stdout(mut socket: Socket) -> Result<()> {
     let mut stdout = io::stdout();
     let mut buf = [0u8; crate::BUFFER_SIZE];
     loop {

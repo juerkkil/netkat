@@ -44,6 +44,9 @@ struct Args {
     verbose: bool,
 }
 
+// UDP Connection is not really a thing since it's a stateless protocol,
+// but in our case UdpSocket +  SocketAddr -pair represents a "connection"
+// analogous to TcpStream
 pub struct UdpConnection {
     socket: UdpSocket,
     peer: SocketAddr,
