@@ -1,6 +1,5 @@
 use async_std::os::unix::net::{UnixListener, UnixStream};
 use clap::Parser;
-use futures::{future::FutureExt, pin_mut, select};
 
 use crate::{std_socket_io, Args, Result, Socket};
 
@@ -15,7 +14,9 @@ pub async fn run_unix_socket_server(addr: &str) -> Result<()> {
     if args.verbose {
         eprintln!("Got connection from {:?}", peer);
     }
-    run_unixstream_tasks(sock).await
+    let write_sock = Socket::UnixSocketStream(sock.clone());
+    let read_sock = Socket::UnixSocketStream(sock);
+    std_socket_io::run_async_tasks(read_sock, write_sock).await
 }
 
 pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
@@ -27,17 +28,6 @@ pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
     if args.verbose {
         eprintln!("Successfully connected to {}", addr)
     }
-    run_unixstream_tasks(sock).await
-}
-
-async fn run_unixstream_tasks(stream: UnixStream) -> Result<()> {
-    let socket = Socket::UnixSocketStream(stream.clone());
-    let socket2 = Socket::UnixSocketStream(stream);
-    let stdin_task = std_socket_io::stdin_to_stream(socket2).fuse();
-    let stdout_task = std_socket_io::socket_to_stdout(socket).fuse();
-    pin_mut!(stdin_task, stdout_task);
-    select! {
-        _res = stdin_task => _res,
-        _res = stdout_task => _res,
-    }
+    let write_sock = Socket::UnixSocketStream(sock.clone());
+    std_socket_io::run_async_tasks(Socket::UnixSocketStream(sock), write_sock).await
 }

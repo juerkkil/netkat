@@ -1,32 +1,29 @@
 use async_std::io::{self};
 use clap::Parser;
 use futures::AsyncWriteExt;
-use futures::{future::FutureExt, pin_mut, select};
 
 use async_std::net::{ToSocketAddrs, UdpSocket};
 
-use crate::{std_socket_io, Args, Result, Socket};
+use crate::{std_socket_io, Args, Result, Socket, UdpConnection};
 
 pub async fn run_udp_client(hostname: &str, target_port: u16) -> Result<()> {
     let udp_socket = std::net::UdpSocket::bind("0.0.0.0:0")?;
-    let cloned_socket = udp_socket.try_clone()?;
-    let async_socket = UdpSocket::from(udp_socket);
-    let async_clone = Socket::UDP(UdpSocket::from(cloned_socket));
     let target = format!("{}:{}", hostname, target_port);
     let server = match target.to_socket_addrs().await?.next() {
         Some(server) => server,
         None => return Err("Empty socket address".into()),
     };
 
-    let stdin_task = std_socket_io::stdin_to_udpsocket(async_socket, server).fuse();
-    let stdout_task = std_socket_io::socket_to_stdout(async_clone).fuse();
-
-    pin_mut!(stdin_task, stdout_task);
-    select! {
-        _res = stdin_task => _res?,
-        _res = stdout_task => _res?,
-    }
-    Ok(())
+    let cloned_socket = udp_socket.try_clone()?;
+    let udp_conn_read = UdpConnection {
+        socket: UdpSocket::from(udp_socket),
+        peer: server,
+    };
+    let udp_conn_write = UdpConnection {
+        socket: UdpSocket::from(cloned_socket),
+        peer: server,
+    };
+    std_socket_io::run_async_tasks(Socket::UDP(udp_conn_read), Socket::UDP(udp_conn_write)).await
 }
 
 pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
@@ -38,9 +35,6 @@ pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
         eprintln!("Listening udp socket at {:?}", serveraddr);
     }
 
-    // Some dirty hacks here, since async_std::net::UdpSocket doesn't implement try_clone(),
-    // we'll first create non-async UDP socket, clone it and turn into async sockets once
-    // we have an active peer.
     let udp_socket = std::net::UdpSocket::bind(serveraddr)?;
     let mut buf = [0_u8; crate::BUFFER_SIZE];
 
@@ -53,17 +47,14 @@ pub async fn run_udp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
     io::stdout().flush().await?;
 
     let cloned_socket = udp_socket.try_clone()?;
-    let async_socket = UdpSocket::from(udp_socket);
 
-    let async_clone = Socket::UDP(UdpSocket::from(cloned_socket));
-
-    let stdin_task = std_socket_io::stdin_to_udpsocket(async_socket, peer).fuse();
-    let stdout_task = std_socket_io::socket_to_stdout(async_clone).fuse();
-
-    pin_mut!(stdin_task, stdout_task);
-    select! {
-        _res = stdin_task => _res?,
-        _res = stdout_task => _res?,
-    }
-    return Ok(());
+    let udp_conn_read = UdpConnection {
+        socket: UdpSocket::from(udp_socket),
+        peer: peer,
+    };
+    let udp_conn_write = UdpConnection {
+        socket: UdpSocket::from(cloned_socket),
+        peer: peer,
+    };
+    std_socket_io::run_async_tasks(Socket::UDP(udp_conn_read), Socket::UDP(udp_conn_write)).await
 }
