@@ -17,7 +17,7 @@ pub async fn run_unix_socket_server(addr: &str) -> Result<()> {
     }
     let sock_write = Socket::UnixSocketStream(sock.clone());
     let sock_read = Socket::UnixSocketStream(sock);
-    run_unixstream_tasks(sock_read, sock_write).await
+    std_socket_io::run_async_tasks(sock_read, sock_write).await
 }
 
 pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
@@ -33,9 +33,9 @@ pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
     run_unixstream_tasks(Socket::UnixSocketStream(sock), wsock).await
 }
 
-async fn run_unixstream_tasks(rsock: Socket, wsock: Socket) -> Result<()> {
-    let stdin_task = std_socket_io::stdin_to_socket(wsock).fuse();
-    let stdout_task = std_socket_io::socket_to_stdout(rsock).fuse();
+async fn run_unixstream_tasks(read_sock: Socket, write_sock: Socket) -> Result<()> {
+    let stdin_task = std_socket_io::stdin_to_socket(write_sock).fuse();
+    let stdout_task = std_socket_io::socket_to_stdout(read_sock).fuse();
     pin_mut!(stdin_task, stdout_task);
     select! {
         _res = stdin_task => _res,

@@ -1,20 +1,8 @@
 use async_std::io::{self};
-use async_std::net::{SocketAddr, UdpSocket};
+use futures::{future::FutureExt, pin_mut, select};
 use futures::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{Result, Socket};
-
-pub async fn stdin_to_stream(mut stream: Socket) -> Result<()> {
-    let mut stdin = io::stdin();
-    let _res = match stream {
-        Socket::TCP(ref mut stream) => io::copy(&mut stdin, stream).await?,
-        Socket::UDP(ref _udp_socket) => todo!(),
-        Socket::UnixSocketStream(ref mut stream) => io::copy(&mut stdin, stream).await?,
-        Socket::UnixSocketDatagram(ref _asdf) => todo!(),
-    };
-
-    Ok(())
-}
 
 pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
     let mut stdin = io::stdin();
@@ -24,6 +12,7 @@ pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
             let mut buf = [0u8; crate::BUFFER_SIZE];
             loop {
                 let read_bytes = io::stdin().read(&mut buf).await?;
+                eprintln!("Read {}", read_bytes);
                 let sent_bytes = match read_bytes {
                     1_usize..=usize::MAX => {
                         udp_connection
@@ -33,6 +22,7 @@ pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
                     }
                     _ => break,
                 };
+                eprintln!("Sent {}", sent_bytes);
                 if sent_bytes == 0 {
                     break;
                 }
@@ -42,23 +32,6 @@ pub async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
         Socket::UnixSocketStream(ref mut stream) => io::copy(&mut stdin, stream).await?,
         Socket::UnixSocketDatagram(ref _udp_connection) => todo!(),
     };
-    Ok(())
-}
-
-pub async fn stdin_to_udpsocket(socket: UdpSocket, peer: SocketAddr) -> Result<()> {
-    let mut buf = [0u8; crate::BUFFER_SIZE];
-
-    loop {
-        let read_bytes = io::stdin().read(&mut buf).await?;
-        let sent_bytes = match read_bytes {
-            1_usize..=usize::MAX => socket.send_to(&buf[0..read_bytes], peer).await?,
-            _ => break,
-        };
-        if sent_bytes == 0 {
-            // not sure whether this can happen but just in case
-            break;
-        }
-    }
     Ok(())
 }
 
@@ -83,4 +56,14 @@ pub async fn socket_to_stdout(mut socket: Socket) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub async fn run_async_tasks(read_sock: Socket, write_sock: Socket) -> Result<()> {
+    let stdin_task = stdin_to_socket(write_sock).fuse();
+    let stdout_task = socket_to_stdout(read_sock).fuse();
+    pin_mut!(stdin_task, stdout_task);
+    select! {
+        _res = stdin_task => _res,
+        _res = stdout_task => _res,
+    }
 }
