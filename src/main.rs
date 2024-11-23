@@ -1,5 +1,5 @@
 use async_std::{
-    net::{SocketAddr, TcpStream, UdpSocket},
+    net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket},
     os::unix::net::{UnixDatagram, UnixStream},
 };
 
@@ -36,15 +36,23 @@ struct Args {
     timeout: Option<u64>,
 
     /// Use UNIX domain socket instead of Internet domain socket
-    #[arg(short = 'U')]
+    #[arg(short = 'U', default_value_t = false)]
     unix_socket: bool,
+
+    /// Use only IPv6 addresses
+    #[arg(short = '6', default_value_t = false)]
+    ipv6: bool,
+
+    /// Use only IPv4 addresses
+    #[arg(short = '4', default_value_t = false)]
+    ipv4: bool,
 
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 }
 
-// UDP Connection is not really a thing since it's a stateless protocol,
+// UDP Connection is not really a thing since UDP is a stateless protocol,
 // but in our case UdpSocket +  SocketAddr -pair represents a "connection"
 // analogous to TcpStream
 pub struct UdpConnection {
@@ -57,6 +65,32 @@ pub enum Socket {
     UDP(UdpConnection),
     UnixSocketStream(UnixStream),
     UnixSocketDatagram(UnixDatagram),
+}
+
+async fn get_socket_address(target: &str) -> Result<SocketAddr> {
+    let args = Args::parse();
+    let addrs = target.to_socket_addrs().await?;
+    for addr in addrs {
+        // IP version not defined, so we just return the first SocketAddr
+        if !args.ipv6 && !args.ipv4 {
+            return Ok(addr);
+        }
+
+        if args.ipv4 && addr.is_ipv4() {
+            return Ok(addr);
+        }
+
+        if args.ipv6 && addr.is_ipv6() {
+            return Ok(addr);
+        }
+    }
+    if args.ipv6 {
+        return Err("Unable to resolve a valid IPv6 address".into());
+    }
+    if args.ipv4 {
+        return Err("Unable to resolve a valid IPv6 address".into());
+    }
+    Err("Could not resolve the address".into())
 }
 
 fn main() -> Result<()> {

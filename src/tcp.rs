@@ -1,10 +1,8 @@
-use std::net::ToSocketAddrs;
-
 use async_std::net::{TcpListener, TcpStream};
 
 use clap::Parser;
 
-use crate::{std_socket_io, Args, Result, Socket};
+use crate::{get_socket_address, std_socket_io, Args, Result, Socket};
 
 // // pub async fn run_server(bind_addr: &str, bind_port: Option<u16>) -> Result<()> {}
 
@@ -30,24 +28,30 @@ pub async fn run_tcp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
 }
 
 pub async fn run_tcp_client(hostname: &str, target_port: u16, timeout: Option<u64>) -> Result<()> {
+    let args = Args::parse();
     let target = format!("{}:{}", hostname, target_port);
-    let target_next = match target.to_socket_addrs()?.next() {
-        Some(t) => t,
-        None => return Err("Empty socket addr".into()),
-    };
+    if args.verbose {
+        eprintln!("Connecting to {}", target);
+    }
+    let socket_addr = get_socket_address(&target).await?;
 
     // A bit of dirty hack again, connect_timeout not implemented in async_std::net::TcpStream, thus we first
     // create just a "normal" sync TcpStream and convert it into async.
     let stream = match timeout {
         Some(timeout) => {
+            // async_std::net::TcpStream does not implement connect_timeout() so at first we init just standard
+            // TcpStream and convert it asynchronous
             let sync_stream = std::net::TcpStream::connect_timeout(
-                &target_next,
+                &socket_addr,
                 std::time::Duration::from_secs(timeout),
             )?;
             TcpStream::from(sync_stream)
         }
-        None => TcpStream::connect(target).await?, // No timeout defined
+        None => TcpStream::connect(socket_addr).await?, // No timeout defined
     };
+    if args.verbose {
+        eprintln!("Succesfully connected to {}", socket_addr);
+    }
     let write_sock = Socket::TCP(stream.clone());
     let read_sock = Socket::TCP(stream);
     std_socket_io::run_async_tasks(read_sock, write_sock).await
