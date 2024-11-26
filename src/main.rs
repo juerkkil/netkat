@@ -1,8 +1,3 @@
-use async_std::{
-    net::{SocketAddr, TcpStream, UdpSocket},
-    os::unix::net::{UnixDatagram, UnixStream},
-};
-
 use clap::Parser;
 
 mod net_utils;
@@ -49,21 +44,6 @@ struct Args {
     /// Verbose output
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
-}
-
-// UDP Connection is not really a thing since UDP is a stateless protocol,
-// but in our case UdpSocket +  SocketAddr -pair represents a "connection"
-// analogous to TcpStream
-pub struct UdpConnection {
-    socket: UdpSocket,
-    peer: SocketAddr,
-}
-
-pub enum Socket {
-    TCP(TcpStream),
-    UDP(UdpConnection),
-    UnixSocketStream(UnixStream),
-    UnixSocketDatagram(UnixDatagram),
 }
 
 fn main() -> Result<()> {

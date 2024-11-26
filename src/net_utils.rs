@@ -1,13 +1,29 @@
 use async_std::io;
-use async_std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs, UdpSocket};
+use async_std::{
+    net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs, UdpSocket},
+    os::unix::net::UnixStream,
+};
 
 use clap::Parser;
 
 use futures::AsyncWriteExt;
 
-use crate::{stdio_utils, Args, Result, Socket, UdpConnection};
+use crate::{stdio_utils, Args, Result};
 
-// // pub async fn run_server(bind_addr: &str, bind_port: Option<u16>) -> Result<()> {}
+// UDP Connection is not really a thing since UDP is a stateless protocol,
+// but in our case UdpSocket +  SocketAddr -pair represents a "connection"
+// analogous to TcpStream
+pub struct UdpConnection {
+    pub socket: UdpSocket,
+    pub peer: SocketAddr,
+}
+
+pub enum Socket {
+    TCP(TcpStream),
+    UDP(UdpConnection),
+    UnixSocketStream(UnixStream),
+    //    UnixSocketDatagram(UnixDatagram),
+}
 
 pub async fn run_tcp_server(bind_addr: &str, bind_port: u16) -> Result<()> {
     let args = Args::parse();

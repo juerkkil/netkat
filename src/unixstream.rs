@@ -1,7 +1,8 @@
 use async_std::os::unix::net::{UnixListener, UnixStream};
 use clap::Parser;
 
-use crate::{stdio_utils, Args, Result, Socket};
+use crate::net_utils::Socket;
+use crate::{stdio_utils, Args, Result};
 
 pub async fn run_unix_socket_server(addr: &str) -> Result<()> {
     let args = Args::parse();
