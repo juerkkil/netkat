@@ -1,7 +1,8 @@
 use async_std::os::unix::net::{UnixListener, UnixStream};
 use clap::Parser;
 
-use crate::{std_socket_io, Args, Result, Socket};
+use crate::net_utils::Socket;
+use crate::{stdio_utils, Args, Result};
 
 pub async fn run_unix_socket_server(addr: &str) -> Result<()> {
     let args = Args::parse();
@@ -16,7 +17,7 @@ pub async fn run_unix_socket_server(addr: &str) -> Result<()> {
     }
     let write_sock = Socket::UnixSocketStream(sock.clone());
     let read_sock = Socket::UnixSocketStream(sock);
-    std_socket_io::run_async_tasks(read_sock, write_sock).await
+    stdio_utils::run_async_tasks(read_sock, write_sock).await
 }
 
 pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
@@ -29,5 +30,5 @@ pub async fn run_unix_socket_client(addr: &str) -> Result<()> {
         eprintln!("Successfully connected to {}", addr)
     }
     let write_sock = Socket::UnixSocketStream(sock.clone());
-    std_socket_io::run_async_tasks(Socket::UnixSocketStream(sock), write_sock).await
+    stdio_utils::run_async_tasks(Socket::UnixSocketStream(sock), write_sock).await
 }

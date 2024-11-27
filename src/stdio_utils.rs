@@ -2,7 +2,8 @@ use async_std::io::{self};
 use futures::{future::FutureExt, pin_mut, select};
 use futures::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{Result, Socket};
+use crate::net_utils::Socket;
+use crate::Result;
 
 async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
     let mut stdin = io::stdin();
@@ -28,7 +29,6 @@ async fn stdin_to_socket(mut sock: Socket) -> Result<()> {
             0
         }
         Socket::UnixSocketStream(ref mut stream) => io::copy(&mut stdin, stream).await?,
-        Socket::UnixSocketDatagram(ref _udp_connection) => todo!(),
     };
     Ok(())
 }
@@ -43,7 +43,6 @@ async fn socket_to_stdout(mut socket: Socket) -> Result<()> {
             Socket::TCP(ref mut stream) => stream.read(&mut buf).await?,
             Socket::UDP(ref udp_socket) => udp_socket.socket.recv_from(&mut buf).await?.0,
             Socket::UnixSocketStream(ref mut stream) => stream.read(&mut buf).await?,
-            Socket::UnixSocketDatagram(_a) => todo!(),
         };
         match bytes_read {
             1_usize..=usize::MAX => {

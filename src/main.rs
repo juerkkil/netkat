@@ -1,13 +1,7 @@
-use async_std::{
-    net::{SocketAddr, TcpStream, ToSocketAddrs, UdpSocket},
-    os::unix::net::{UnixDatagram, UnixStream},
-};
-
 use clap::Parser;
 
-mod std_socket_io;
-mod tcp;
-mod udp;
+mod net_utils;
+mod stdio_utils;
 mod unixstream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
@@ -52,47 +46,6 @@ struct Args {
     verbose: bool,
 }
 
-// UDP Connection is not really a thing since UDP is a stateless protocol,
-// but in our case UdpSocket +  SocketAddr -pair represents a "connection"
-// analogous to TcpStream
-pub struct UdpConnection {
-    socket: UdpSocket,
-    peer: SocketAddr,
-}
-
-pub enum Socket {
-    TCP(TcpStream),
-    UDP(UdpConnection),
-    UnixSocketStream(UnixStream),
-    UnixSocketDatagram(UnixDatagram),
-}
-
-async fn get_socket_address(target: &str) -> Result<SocketAddr> {
-    let args = Args::parse();
-    let addrs = target.to_socket_addrs().await?;
-    for addr in addrs {
-        // IP version not defined, so we just return the first SocketAddr
-        if !args.ipv6 && !args.ipv4 {
-            return Ok(addr);
-        }
-
-        if args.ipv4 && addr.is_ipv4() {
-            return Ok(addr);
-        }
-
-        if args.ipv6 && addr.is_ipv6() {
-            return Ok(addr);
-        }
-    }
-    if args.ipv6 {
-        return Err("Unable to resolve a valid IPv6 address".into());
-    }
-    if args.ipv4 {
-        return Err("Unable to resolve a valid IPv6 address".into());
-    }
-    Err("Could not resolve the address".into())
-}
-
 fn main() -> Result<()> {
     let args = Args::parse();
     let address = match args.address {
@@ -120,19 +73,19 @@ fn main() -> Result<()> {
     let res: Result<()>;
     if args.listen {
         if args.udp {
-            res = async_std::task::block_on(udp::run_udp_server(address, port));
+            res = async_std::task::block_on(net_utils::run_udp_server(address, port));
         } else if args.unix_socket {
             res = async_std::task::block_on(unixstream::run_unix_socket_server(address));
         } else {
-            res = async_std::task::block_on(tcp::run_tcp_server(address, port));
+            res = async_std::task::block_on(net_utils::run_tcp_server(address, port));
         }
     } else {
         if args.udp {
-            res = async_std::task::block_on(udp::run_udp_client(address, port));
+            res = async_std::task::block_on(net_utils::run_udp_client(address, port));
         } else if args.unix_socket {
             res = async_std::task::block_on(unixstream::run_unix_socket_client(address));
         } else {
-            res = async_std::task::block_on(tcp::run_tcp_client(address, port, args.timeout));
+            res = async_std::task::block_on(net_utils::run_tcp_client(address, port, args.timeout));
         }
     }
     if res.is_ok() {
