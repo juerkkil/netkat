@@ -14,8 +14,10 @@ Arguments:
 Options:
   -l, --listen             Listen to incoming connection
   -u, --udp                Use UDP instead of TCP
-  -t, --timeout <TIMEOUT>  Connection timeout in seconds (only TCP)
+  -t, --timeout <TIMEOUT>  Timeout in seconds (only TCP)
   -U                       Use UNIX domain socket instead of Internet domain socket
+  -6                       Use only IPv6 addresses
+  -4                       Use only IPv4 addresses
   -v, --verbose            Verbose output
   -h, --help               Print help
   -V, --version            Print version
